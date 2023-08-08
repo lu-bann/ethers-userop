@@ -1,223 +1,227 @@
-use crate::types::UserOpMiddleware;
+use crate::types::{
+    EstimateResult, Request, Response, UserOpMiddlewareError, DUMMY_PAYMASTER_AND_DATA,
+    DUMMY_SIGNATURE,
+};
 use async_trait::async_trait;
-use silius_bundler_primitives::{
-	UserOperationGasEstimate, UserOperationPartial, UserOperationHash,
-	UserOperationReceipt,
-};
 use ethers::{
-	providers::{Middleware, Provider},
-	types::{Address, Block, Bytes, U256},
+    providers::{Middleware, MiddlewareError},
+    types::{Address, Bytes, U256},
 };
-use reqwest::Client;
 use hashbrown::HashMap;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use silius_primitives::{
+    UserOperation, UserOperationHash, UserOperationPartial, UserOperationReceipt,
+};
 
-const DUMMY_PAYMASTER_AND_DATA: &str = "0xC03Aac639Bb21233e0139381970328dB8bcEeB67fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c";
-const DUMMY_SIGNATURE: &str = "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c";
+/// A [ethers-rs](https://docs.rs/ethers/latest/ethers/) middleware that crafts UserOperations
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UserOpMiddleware<M> {
+    /// The inner middleware
+    pub inner: M,
+    /// The address of the entry point contract
+    pub entry_point_address: Address,
+    /// The RPC Endpoint to communicate with
+    pub rpc_address: String,
+    /// The chain id
+    pub chain_id: u64,
+    /// The client to use for HTTP requests
+    #[serde(skip)]
+    pub client: Client,
+    /// The map of user operation hashes to user operations
+    #[serde(skip)]
+    pub user_operation_tracker: HashMap<UserOperationHash, UserOperation>,
+}
+
+impl<M: Middleware> MiddlewareError for UserOpMiddlewareError<M> {
+    type Inner = M::Error;
+
+    fn from_err(src: M::Error) -> Self {
+        UserOpMiddlewareError::MiddlewareError(src)
+    }
+
+    #[allow(unreachable_patterns)]
+    fn as_inner(&self) -> Option<&Self::Inner> {
+        match self {
+            UserOpMiddlewareError::MiddlewareError(e) => Some(e),
+            _ => None,
+        }
+    }
+}
 
 #[async_trait]
 impl<M: Middleware> Middleware for UserOpMiddleware<M> {
-	type Error = M::Error;
-	type Provider = M::Provider;
-	type Inner = M;
+    type Error = UserOpMiddlewareError<M>;
+    type Provider = M::Provider;
+    type Inner = M;
 
-	fn inner(&self) -> &M {
-		self.inner
-	}
-
-	async fn estimate_gas(
-		&self,
-		tx: &ethers::types::TransactionRequest,
-	) -> Result<ethers::types::U256, Self::Error> {
-		let sender = tx.from.unwrap_or_else(|| self.inner.get_signer().unwrap());
-		let nonce = self
-			.inner
-			.get_transaction_count(sender, Some(Block::Pending.into()))
-			.await?;
-		let call_data = tx.data.clone().unwrap_or_default();
-
-		let user_operation_partial = self
-			.generate_user_operation_partial(sender, nonce, call_data)
-			.unwrap();
-
-		let user_operation_gas_estimation = self
-			.estimate_user_operation_gas(&user_operation_partial)
-			.await?;
-
-		Ok(user_operation_gas_estimation.total_gas)
-
-	}
-
-	async fn send_transaction(
-		&self,
-		tx: &ethers::types::TransactionRequest,
-	) -> Result<ethers::types::TransactionResponse<Self::Provider>, Self::Error> {
-		todo!()
-	}
+    fn inner(&self) -> &M {
+        &self.inner
+    }
 }
 
 impl<M: Middleware> UserOpMiddleware<M> {
+    pub fn new(inner: M, entry_point_address: Address, rpc_address: String, chain_id: u64) -> Self {
+        let client = reqwest::Client::new();
 
-	pub fn new(
-		inner: M,
-		entry_point_address: Address,
-		rpc_address: String,
-		chain_id: u64,
-	) -> Self {
+        Self {
+            inner,
+            entry_point_address,
+            rpc_address,
+            chain_id,
+            client,
+            user_operation_tracker: HashMap::new(),
+        }
+    }
 
-		let mut client = reqwest::Client::new();
+    pub async fn deploy_smart_contract_wallet(
+        &self,
+        sender: Address,
+        nonce: U256,
+        call_data: Bytes,
+    ) -> anyhow::Result<()> {
+        let uo_partical = self.generate_user_operation_partial(sender, nonce, call_data)?;
+        let uo = UserOperation::from(uo_partical);
 
-		Self {
-			inner,
-			entry_point_address,
-			rpc_address,
-			chain_id,
-			client,
-			user_operation_tracker: HashMap::new(),
-		}
-	}
+        let _uo_gas_estimation = self.estimate_user_operation_gas(&uo).await?;
 
-	pub fn generate_user_operation_partial(
-		&mut self,
-		sender: Address,
-		nonce: U256,
-		call_data: Bytes,
-	) -> anyhow::Result<UserOperationPartial> {
+        Ok(())
+    }
 
-		let user_operation_partial = UserOperationPartial {
-			sender: Some(sender),
-			nonce: Some(nonce),
-			init_code: None,
-			call_data: Some(call_data),
-			call_gas_limit: None,
-			verification_gas_limit: None,
-			pre_verification_gas: None,
-			max_fee_per_gas: None,
-			max_priority_fee_per_gas: None,
-			paymaster_and_data: Some(Bytes::from(DUMMY_PAYMASTER_AND_DATA)),
-			signature: Some(Bytes::from(DUMMY_SIGNATURE)),
-		};
+    /// Generates a user operation partial from the given parameters for gas estimation
+    ///
+    /// # Arguments
+    /// `sender` - The address of the sender
+    /// `nonce` - The nonce of the sender
+    /// `call_data` - The call data of the transaction
+    ///
+    /// # Returns
+    /// A user operation partial
+    pub fn generate_user_operation_partial(
+        &self,
+        sender: Address,
+        nonce: U256,
+        call_data: Bytes,
+    ) -> anyhow::Result<UserOperationPartial> {
+        let user_operation_partial = UserOperationPartial {
+            sender: Some(sender),
+            nonce: Some(nonce),
+            init_code: None,
+            call_data: Some(call_data),
+            call_gas_limit: None,
+            verification_gas_limit: None,
+            pre_verification_gas: None,
+            max_fee_per_gas: None,
+            max_priority_fee_per_gas: None,
+            paymaster_and_data: Some(Bytes::from((*DUMMY_PAYMASTER_AND_DATA).as_bytes().to_vec())),
+            signature: Some(Bytes::from((*DUMMY_SIGNATURE).as_bytes().to_vec())),
+        };
 
-		Ok(user_operation_partial)
-	}
+        Ok(user_operation_partial)
+    }
 
-	pub async fn estimate_user_operation_gas(
-		&self,
-		user_operation_partial: &UserOperationPartial,
-	) -> anyhow::Result<UserOperationGasEstimation> {
+    pub async fn estimate_user_operation_gas(
+        &self,
+        user_operation: &UserOperation,
+    ) -> anyhow::Result<Response<EstimateResult>> {
+        let params = vec![json!(user_operation), json!(self.entry_point_address)];
 
-		let mut params = Vec::new();
-		params.push(json!(user_operation_partial));
+        let req_body = Request {
+            jsonrpc: "2.0".to_string(),
+            method: "eth_estimateUserOperationGas".to_string(),
+            params: params.clone(),
+            id: 1,
+        };
 
-		let response = self
-			.client
-			.post(&self.rpc_address)
-			.json(&json!({
-				"jsonrpc": "2.0",
-				"method": "eth_estimateUserOperationGas",
-				"params": params,
-				"id": 1,
-			}))
-			.send()
-			.await?
-			.json::<Response<UserOperationGasEstimation>>()?;
+        let response = self
+            .client
+            .post(&self.rpc_address)
+            .json(&req_body)
+            .send()
+            .await?;
+        let str_response = response.text().await?;
+        let res = serde_json::from_str::<Response<EstimateResult>>(&str_response)?;
 
-		Ok(response.result)
-	}
+        Ok(res)
+    }
 
-	pub async fn send_user_operation(
-		&self,
-		uo: &UserOperation,
-	) -> anyhow::Result<UserOperationHash> {
+    pub async fn send_user_operation(
+        &self,
+        uo: &UserOperation,
+    ) -> anyhow::Result<Response<UserOperationHash>> {
+        let params = vec![json!(uo), json!(self.entry_point_address)];
 
-		let mut params = Vec::new();
-		params.push(json!(uo));
+        let req_body = Request {
+            jsonrpc: "2.0".to_string(),
+            method: "eth_sendUserOperation".to_string(),
+            params: params.clone(),
+            id: 1,
+        };
 
-		let response = self
-			.client
-			.post(&self.rpc_address)
-			.json(&json!({
-				"jsonrpc": "2.0",
-				"method": "eth_sendUserOperation",
-				"params": params,
-				"id": 1,
-			}))
-			.send()
-			.await?
-			.json::<Response<UserOperationHash>>()?;
+        let response = self
+            .client
+            .post(&self.rpc_address)
+            .json(&req_body)
+            .send()
+            .await?;
+        let str_response = response.text().await?;
+        let res = serde_json::from_str::<Response<UserOperationHash>>(&str_response)?;
 
-		match response.result {
-			Some(user_operation_hash) => Ok(
-				{
+        Ok(res)
+    }
 
-					self.user_operation_tracker
-						.insert(user_operation_hash, uo.clone());
+    pub fn supported_entry_point(&self) -> Address {
+        self.entry_point_address
+    }
 
-					Ok(
-						user_operation_hash
-					)
-				}
-			),
-			None => Err(anyhow::anyhow!("No user operation hash returned")),
-		}
+    pub fn chain_id(&self) -> u64 {
+        self.chain_id
+    }
 
-	}
+    pub async fn get_user_operation_receipt(
+        &self,
+        user_operation_hash: &UserOperationHash,
+    ) -> anyhow::Result<UserOperationReceipt> {
+        let params = vec![json!(user_operation_hash)];
 
-	pub fn supported_entry_point(&self) -> Address {
-		self.entry_point_address
-	}
+        let response = self
+            .client
+            .post(&self.rpc_address)
+            .json(&json!({
+                "jsonrpc": "2.0",
+                "method": "eth_getUserOperationReceipt",
+                "params": params,
+                "id": 1,
+            }))
+            .send()
+            .await?
+            .json::<Response<UserOperationReceipt>>()
+            .await?;
 
-	pub fn chain_id(&self) -> u64 {
-		self.chain_id
-	}
+        Ok(response.result)
+    }
 
-	pub async fn get_user_operation_receipt(
-		&self,
-		user_operation_hash: &UserOperationHash,
-	) -> anyhow::Result<UserOperationReceipt> {
+    pub async fn get_user_operation_by_hash(
+        &self,
+        user_operation_hash: &UserOperationHash,
+    ) -> anyhow::Result<String> {
+        let params = vec![json!(user_operation_hash)];
 
-		let mut params = Vec::new();
-		params.push(json!(user_operation_hash));
+        let response = self
+            .client
+            .post(&self.rpc_address)
+            .json(&json!({
+                "jsonrpc": "2.0",
+                "method": "eth_getUserOperationByHash",
+                "params": params,
+                "id": 1,
+            }))
+            .send()
+            .await?
+            .json::<Response<String>>()
+            .await?;
 
-		let response = self
-			.client
-			.post(&self.rpc_address)
-			.json(&json!({
-				"jsonrpc": "2.0",
-				"method": "eth_getUserOperationReceipt",
-				"params": params,
-				"id": 1,
-			}))
-			.send()
-			.await?
-			.json::<Response<UserOperationReceipt>>()?;
-
-		Ok(response.result)
-	}	
-
-	pub async fn get_user_operation_by_hash(
-		&self,
-		user_operation_hash: &UserOperationHash,
-	) -> anyhow::Result<String> {
-
-		let mut params = Vec::new();
-		params.push(json!(user_operation_hash));
-
-		let response = self
-			.client
-			.post(&self.rpc_address)
-			.json(&json!({
-				"jsonrpc": "2.0",
-				"method": "eth_getUserOperationByHash",
-				"params": params,
-				"id": 1,
-			}))
-			.send()
-			.await?
-			.json::<Response<String>>()?;
-
-		Ok(response.result)
-	}
-
-
-	
-} 
+        Ok(response.result)
+    }
+}

@@ -1,2 +1,3 @@
-format:
-	cargo fmt --all
+lint:
+	cargo make format
+	cargo clippy
