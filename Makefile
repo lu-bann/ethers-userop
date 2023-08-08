@@ -1,0 +1,2 @@
+format:
+	cargo fmt --all
