@@ -166,7 +166,9 @@ impl<M: Middleware> UserOpMiddleware<M> {
             .send()
             .await?;
         let str_response = response.text().await?;
+        println!("{}", str_response);
         let res = serde_json::from_str::<Response<UserOperationHash>>(&str_response)?;
+        println!("{:?}", res);
 
         Ok(res)
     }

@@ -1,5 +1,6 @@
+use crate::gen::executeCall;
 use alloy_primitives::{Address, U256};
-use alloy_sol_types::{sol, SolCall};
+use alloy_sol_types::SolCall;
 use ethers::{
     prelude::{NonceManagerMiddleware, SignerMiddleware},
     providers::{Http, Middleware, Provider},
@@ -69,7 +70,6 @@ pub struct Response<T> {
 }
 
 // Simple account `execute()` function. See https://github.com/eth-infinitism/account-abstraction/blob/75f02457e71bcb4a63e5347589b75fa4da5c9964/contracts/samples/SimpleAccount.sol#L67
-sol! {function execute(address dest, uint256 value, bytes calldata func);}
 pub struct SimpleAccountExecute(executeCall);
 impl SimpleAccountExecute {
     pub fn new(address: EAddress, value: EU256, func: EBytes) -> Self {

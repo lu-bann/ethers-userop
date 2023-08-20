@@ -75,9 +75,9 @@ async fn main() -> anyhow::Result<()> {
         call_data: Bytes::from(execution.encode()),
         call_gas_limit: U256::from(1),
         verification_gas_limit: U256::from(1000000u64),
-        pre_verification_gas: U256::from(1000000u64),
+        pre_verification_gas: U256::from(1u64),
         max_fee_per_gas: U256::from(1),
-        max_priority_fee_per_gas: priority_fee,
+        max_priority_fee_per_gas: U256::from(1),
         paymaster_and_data: Bytes::new(),
         signature: Bytes::from(DUMMY_SIGNATURE.as_bytes().to_vec()),
     };
@@ -106,19 +106,23 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     println!("res: {:?}", res);
 
+    // estimated_gas: Response { jsonrpc: "2.0", id: 1, result: EstimateResult { pre_verification_gas: 44572, verification_gas_limit: 340583, call_gas_limit: 21797 } }
     // Send the UserOperation after getting the estimated gas
     let uo = UserOperation {
         pre_verification_gas: res
             .result
             .pre_verification_gas
             .saturating_add(U256::from(1000)),
+        // .saturating_add(U256::from(10)),
+        // {"jsonrpc":"2.0","error":{"code":-32602,"message":"Pre-verification gas 44582 is lower than calculated pre-verification gas 44656"},"id":1}
         verification_gas_limit: res.result.verification_gas_limit,
         call_gas_limit: res.result.call_gas_limit.saturating_mul(U256::from(2)),
+        // call_gas_limit: res.result.call_gas_limit.saturating_add(U256::from(1000)),
+        // {"jsonrpc":"2.0","error":{"code":-32602,"message":"Call gas limit 22797 is lower than call gas estimation 23338"},"id":1}
         max_priority_fee_per_gas: priority_fee,
         max_fee_per_gas: gas_price,
         ..user_op
     };
-    println!("uo: {:?}", uo);
 
     // Sign the UserOperation
     let signed_uo = uo_wallet
