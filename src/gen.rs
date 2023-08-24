@@ -21,6 +21,13 @@ impl<M: Middleware + 'static> SmartWalletAccountFactory<M> for SimpleAccountFact
     /// create an account, and return its address
     /// returns the address even if the account is already deployed
     /// Note that during UserOperation execution, this method is called only if the account is not deployed.
+    ///
+    /// # Arguments
+    /// * `creator_address` - The address of the user that creates the account
+    /// * `salt` - The salt
+    ///
+    /// # Returns
+    /// * `FunctionCall` - The function call
     fn create_account(
         &self,
         creator_address: Address,
@@ -30,6 +37,13 @@ impl<M: Middleware + 'static> SmartWalletAccountFactory<M> for SimpleAccountFact
     }
 
     /// calculate the counterfactual address of this account given a salt
+    ///
+    /// # Arguments
+    /// * `creator_address` - The address of the user that creates the account
+    /// * `salt` - The salt
+    ///
+    /// # Returns
+    /// * `FunctionCall` - The function call
     fn generate_address(
         &self,
         creator_address: Address,

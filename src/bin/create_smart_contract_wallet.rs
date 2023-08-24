@@ -40,20 +40,20 @@ async fn main() -> anyhow::Result<()> {
     // Instantiate the SimpleAccountFactory contract
     let simple_account_factory = SimpleAccountFactory::new(factory_address, provider.clone());
     // calculate the counterfactual address of this account as it would be returned by createAccount()
-    let swc_address = simple_account_factory
+    let scw_address = simple_account_factory
         .get_address(signer_address, U256::from(SALT))
         .call()
         .await?;
 
     // Fund the newly created smart contract account
     let tx = TransactionRequest::new()
-        .to(swc_address)
+        .to(scw_address)
         .value(parse_ether("10").unwrap())
         .from(signer_address);
     let _tx = provider.send_transaction(tx, None).await?.await?;
 
     // Prepare the UserOperation to send
-    let nonce = provider.get_transaction_count(swc_address, None).await?;
+    let nonce = provider.get_transaction_count(scw_address, None).await?;
     let init_calldata = simple_account_factory.create_account(signer_address, U256::from(SALT));
     let tx: TypedTransaction = init_calldata.tx;
     let mut init_code = Vec::new();
@@ -70,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create the UserOperation
     let user_op = UserOperation {
-        sender: swc_address,
+        sender: scw_address,
         nonce,
         init_code: Bytes::from(init_code),
         call_data: Bytes::from(execution.encode()),

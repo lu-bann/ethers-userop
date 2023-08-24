@@ -1,4 +1,6 @@
 pub mod consts;
+#[allow(dead_code)]
+mod errors;
 pub mod gen;
 pub mod traits;
 #[allow(dead_code)]

@@ -1,6 +1,7 @@
 use crate::{
     consts::{DUMMY_PAYMASTER_AND_DATA, DUMMY_SIGNATURE},
-    types::{EstimateResult, Request, Response, UserOpMiddlewareError},
+    errors::UserOpMiddlewareError,
+    types::{EstimateResult, Request, Response},
 };
 use async_trait::async_trait;
 use ethers::{
@@ -41,11 +42,9 @@ impl<M: Middleware> MiddlewareError for UserOpMiddlewareError<M> {
         UserOpMiddlewareError::MiddlewareError(src)
     }
 
-    #[allow(unreachable_patterns)]
     fn as_inner(&self) -> Option<&Self::Inner> {
         match self {
             UserOpMiddlewareError::MiddlewareError(e) => Some(e),
-            _ => None,
         }
     }
 }

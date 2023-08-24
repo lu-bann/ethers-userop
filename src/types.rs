@@ -3,24 +3,15 @@ use alloy_primitives::{Address, U256};
 use alloy_sol_types::SolCall;
 use ethers::{
     prelude::{NonceManagerMiddleware, SignerMiddleware},
-    providers::Middleware,
     signers::LocalWallet,
     types::{Address as EAddress, Bytes as EBytes, U256 as EU256},
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use thiserror::Error;
 
 /// Nonce manager middleware type alias
 pub type SignerType<M> = NonceManagerMiddleware<SignerMiddleware<Arc<M>, LocalWallet>>;
 
-// Error thrown when the UserOpMiddleware interacts with the bundlers
-#[derive(Debug, Clone, Error)]
-pub enum UserOpMiddlewareError<M: Middleware> {
-    /// Thrown when the internal middleware errors
-    #[error("Middleware error: {0}")]
-    MiddlewareError(M::Error),
-}
 #[derive(Debug, Serialize)]
 pub struct Request<T> {
     pub jsonrpc: String,
@@ -83,8 +74,8 @@ pub enum WalletRegistry {
 impl WalletRegistry {
     pub fn from_str(s: &str) -> anyhow::Result<WalletRegistry> {
         match s {
-            "simple_account" => Ok(WalletRegistry::SimpleAccount),
-            _ => Err(anyhow::anyhow!("Unknown wallet registry type")),
+            "simple-account" => Ok(WalletRegistry::SimpleAccount),
+            _ => Err(anyhow::anyhow!("{} wallet currently not supported", s)),
         }
     }
 }
