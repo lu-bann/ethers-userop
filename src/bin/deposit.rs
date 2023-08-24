@@ -6,10 +6,10 @@ use ethers::{
     utils::parse_ether,
 };
 use ethers_userop::{
-    gen::{EntryPoint, SimpleAccountFactory},
-    types::{
+    consts::{
         GETH_CHAIN_ID, GETH_ENTRY_POINT_ADDRESS, GETH_SIMPLE_ACCOUNT_FACTORY, SALT, SEED_PHRASE,
     },
+    gen::{EntryPoint, SimpleAccountFactory},
     UserOpMiddleware,
 };
 use std::sync::Arc;

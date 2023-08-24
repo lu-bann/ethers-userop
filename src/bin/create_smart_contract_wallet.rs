@@ -7,11 +7,12 @@ use ethers::{
     utils::parse_ether,
 };
 use ethers_userop::{
-    gen::SimpleAccountFactory,
-    types::{
-        SimpleAccountExecute, DUMMY_SIGNATURE, GETH_CHAIN_ID, GETH_ENTRY_POINT_ADDRESS,
-        GETH_SIMPLE_ACCOUNT_FACTORY, SALT, SEED_PHRASE,
+    consts::{
+        DUMMY_SIGNATURE, GETH_CHAIN_ID, GETH_ENTRY_POINT_ADDRESS, GETH_SIMPLE_ACCOUNT_FACTORY,
+        SALT, SEED_PHRASE,
     },
+    gen::SimpleAccountFactory,
+    types::SimpleAccountExecute,
     UserOpMiddleware,
 };
 use silius_primitives::{UserOperation, Wallet as UoWallet};

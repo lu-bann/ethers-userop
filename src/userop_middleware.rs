@@ -1,6 +1,6 @@
-use crate::types::{
-    EstimateResult, Request, Response, UserOpMiddlewareError, DUMMY_PAYMASTER_AND_DATA,
-    DUMMY_SIGNATURE,
+use crate::{
+    consts::{DUMMY_PAYMASTER_AND_DATA, DUMMY_SIGNATURE},
+    types::{EstimateResult, Request, Response, UserOpMiddlewareError},
 };
 use async_trait::async_trait;
 use ethers::{

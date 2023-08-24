@@ -6,11 +6,9 @@ use ethers::{
     utils::parse_ether,
 };
 use ethers_userop::{
+    consts::{DUMMY_SIGNATURE, GETH_CHAIN_ID, GETH_SIMPLE_ACCOUNT_FACTORY, SALT, SEED_PHRASE},
     gen::SimpleAccountFactory,
-    types::{
-        SimpleAccountExecute, DUMMY_SIGNATURE, GETH_CHAIN_ID, GETH_SIMPLE_ACCOUNT_FACTORY, SALT,
-        SEED_PHRASE,
-    },
+    types::SimpleAccountExecute,
 };
 use silius_primitives::UserOperation;
 use std::sync::Arc;
@@ -66,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
     let _user_op = UserOperation {
         sender: swc_address,
         nonce,
-        init_code: Bytes::from(init_code),
+        init_code: Bytes::default(),
         call_data: Bytes::from(execution.encode()),
         call_gas_limit: U256::from(1),
         verification_gas_limit: U256::from(1000000u64),

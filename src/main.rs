@@ -8,8 +8,9 @@ use ethers::{
     utils::{Geth, GethInstance},
 };
 use ethers_userop::{
+    consts::{GETH_ENTRY_POINT_ADDRESS, RPC_NAMESPACE, SEED_PHRASE},
     gen::{EntryPoint, SimpleAccountFactory},
-    types::{ClientType, DeployedContract, GETH_ENTRY_POINT_ADDRESS, RPC_NAMESPACE, SEED_PHRASE},
+    types::{DeployedContract, SignerType},
 };
 use hashbrown::HashSet;
 use pin_utils::pin_mut;
@@ -50,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     dotenv().ok();
-    let (_geth, client) = setup_geth().await?;
+    let (_geth, client): (_, SignerType<Provider<Http>>) = setup_geth().await?;
     let client = Arc::new(client);
     let entry_point = deploy_entry_point(client.clone()).await?;
     let _simple_account_factory =
@@ -217,7 +218,7 @@ where
 }
 
 // Based on https://github.com/Vid201/silius/blob/main/tests/src/common/mod.rs
-pub async fn setup_geth() -> anyhow::Result<(GethInstance, ClientType)> {
+pub async fn setup_geth() -> anyhow::Result<(GethInstance, SignerType<Provider<Http>>)> {
     let chain_id: u64 = 1337;
     let tmp_dir = TempDir::new("test_geth")?;
     let wallet = MnemonicBuilder::<English>::default()
@@ -230,8 +231,9 @@ pub async fn setup_geth() -> anyhow::Result<(GethInstance, ClientType)> {
         .port(port)
         .spawn();
 
-    let provider =
-        Provider::<Http>::try_from(geth.endpoint())?.interval(Duration::from_millis(10u64));
+    let provider = Arc::new(
+        Provider::<Http>::try_from(geth.endpoint())?.interval(Duration::from_millis(10u64)),
+    );
 
     let client = SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
         .nonce_manager(wallet.address());
