@@ -8,5 +8,6 @@ pub mod types;
 #[allow(dead_code)]
 pub mod uo_builder;
 mod userop_middleware;
+pub mod utils;
 
 pub use userop_middleware::UserOpMiddleware;

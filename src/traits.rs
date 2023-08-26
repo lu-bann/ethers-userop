@@ -1,8 +1,11 @@
+use alloy_primitives::{Address as a_Address, U256 as a_U256};
+use alloy_sol_types::sol;
+use alloy_sol_types::SolCall;
 use core::fmt::Debug;
 use ethers::{
     prelude::FunctionCall,
     providers::Middleware,
-    types::{Address, H160, U256},
+    types::{Address, Bytes, H160, U256},
 };
 use std::sync::Arc;
 pub trait SmartWalletAccountFactory<M: Middleware>: Debug {
@@ -33,11 +36,31 @@ pub trait SmartWalletAccountFactory<M: Middleware>: Debug {
         salt: U256,
     ) -> FunctionCall<Arc<M>, M, H160>;
 
-    /// Implementing the Clone trait for trait
+    /// Implementing the Clone trait for UserOperationBuilder
     fn clone_box(&self) -> Box<dyn SmartWalletAccountFactory<M>>;
 }
 
-pub trait SmartWalletAccount {
+sol! {function execute(address dest, uint256 value, bytes calldata func);}
+pub trait SmartWalletAccount: Debug + Send {
     /// Executes a transaction (called direcly from the owner or entryPoint)
-    fn execute(&self, dest: Address, value: U256, func: Vec<u8>) -> anyhow::Result<()>;
+    /// Default implementation provided
+    ///
+    /// # Arguments
+    /// * `dest` - The destination address
+    /// * `value` - The value sent
+    /// * `func` - The function signature
+    ///
+    /// # Returns
+    /// * `Vec<u8> - The encoded calldata
+    fn execute(&self, dest: Address, value: U256, func: Bytes) -> Vec<u8> {
+        let call = executeCall {
+            dest: a_Address::from(dest.0),
+            value: a_U256::from_limbs(value.0),
+            func: func.to_vec(),
+        };
+        call.encode()
+    }
+
+    /// Implementing the Clone trait for UserOperationBuilder
+    fn clone_box(&self) -> Box<dyn SmartWalletAccount>;
 }

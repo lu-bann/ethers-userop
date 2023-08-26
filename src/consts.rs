@@ -13,7 +13,9 @@ pub const GETH_ENTRY_POINT_ADDRESS: &str = "0x5fbdb2315678afecb367f032d93f642f64
 pub const SIMPLE_ACCOUNT_FACTORY: &str = "0x9406Cc6185a346906296840746125a0E44976454";
 /// Deployed simple account factory on Geth testnet
 pub const GETH_SIMPLE_ACCOUNT_FACTORY: &str = "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512";
-/// SALT used when creating a new smart contract wallet
+/// Deployed WETH address
+pub const GETH_WETH_ADDRESS: &str = "0xc778417e063141139fce010982780140aa0cd5ab";
+// SALT used when creating a new smart contract wallet
 pub const SALT: u64 = 2;
 /// Test Key phrase
 pub const SEED_PHRASE: &str = "test test test test test test test test test test test junk";

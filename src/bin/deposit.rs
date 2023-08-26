@@ -10,7 +10,6 @@ use ethers_userop::{
         GETH_CHAIN_ID, GETH_ENTRY_POINT_ADDRESS, GETH_SIMPLE_ACCOUNT_FACTORY, SALT, SEED_PHRASE,
     },
     gen::{EntryPoint, SimpleAccountFactory},
-    UserOpMiddleware,
 };
 use std::sync::Arc;
 
@@ -20,7 +19,6 @@ async fn main() -> anyhow::Result<()> {
     let eth_client_address = "http://localhost:8545".to_string();
     let seed = SEED_PHRASE.to_string();
     let provider = Arc::new(Provider::<Http>::try_from(eth_client_address.to_string())?);
-    let rpc_address = format!("http://{}", "127.0.0.1:3000");
     let chain_id = GETH_CHAIN_ID; // Geth testnet
     let factory_address = GETH_SIMPLE_ACCOUNT_FACTORY.to_string().parse::<Address>()?;
     let wallet = MnemonicBuilder::<English>::default()
@@ -38,14 +36,6 @@ async fn main() -> anyhow::Result<()> {
         .get_address(signer_address, U256::from(SALT))
         .call()
         .await?;
-
-    // Instantiate the UserOperation middleware
-    let _uo_middleware = UserOpMiddleware::new(
-        provider.clone(),
-        GETH_ENTRY_POINT_ADDRESS.to_string().parse::<Address>()?,
-        rpc_address,
-        chain_id,
-    );
 
     let ep = EntryPoint::new(
         GETH_ENTRY_POINT_ADDRESS.parse::<Address>()?,

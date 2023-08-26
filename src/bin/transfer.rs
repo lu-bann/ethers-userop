@@ -7,8 +7,7 @@ use ethers::{
 };
 use ethers_userop::{
     consts::{DUMMY_SIGNATURE, GETH_CHAIN_ID, GETH_SIMPLE_ACCOUNT_FACTORY, SALT, SEED_PHRASE},
-    gen::SimpleAccountFactory,
-    types::SimpleAccountExecute,
+    gen::{SimpleAccountExecute, SimpleAccountFactory},
 };
 use silius_primitives::UserOperation;
 use std::sync::Arc;
