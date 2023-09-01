@@ -39,8 +39,8 @@ name = "bundler"
 path = "src/main.rs"
 
 [[bin]]
-name = "create-smart-contract-wallet"
-path = "src/bin/create_smart_contract_wallet.rs"
+name = "example"
+path = "src/bin/example.rs"
 
 [lib]
 path = "src/lib.rs"

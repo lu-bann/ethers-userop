@@ -75,8 +75,9 @@ pub enum WalletRegistry {
     SimpleAccount,
 }
 
-impl WalletRegistry {
-    pub fn from_str(s: &str) -> anyhow::Result<WalletRegistry> {
+impl std::str::FromStr for WalletRegistry {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "simple-account" => Ok(WalletRegistry::SimpleAccount),
             "simple-account-test" => Ok(WalletRegistry::SimpleAccount),
@@ -90,8 +91,9 @@ pub enum WalletFactoryRegistry {
     SimpleAccountFactory(Address),
 }
 
-impl WalletFactoryRegistry {
-    pub fn from_str(s: &str) -> anyhow::Result<WalletFactoryRegistry> {
+impl std::str::FromStr for WalletFactoryRegistry {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "simple-account" => Ok(WalletFactoryRegistry::SimpleAccountFactory(
                 SIMPLE_ACCOUNT_FACTORY.parse::<Address>().unwrap(),

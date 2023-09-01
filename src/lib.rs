@@ -1,5 +1,6 @@
 pub mod consts;
 #[allow(dead_code)]
+#[allow(clippy::enum_variant_names)]
 mod errors;
 pub mod gen;
 pub mod traits;

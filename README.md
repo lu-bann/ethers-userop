@@ -11,5 +11,5 @@ cargo run --bin bundler
 ```
 To create a [SimpleAccount smart contract wallet](https://github.com/eth-infinitism/account-abstraction/blob/develop/contracts/samples/SimpleAccount.sol)
 ```bash
-cargo run --bin create-smart-contract-wallet
+cargo run --bin example
 ```
