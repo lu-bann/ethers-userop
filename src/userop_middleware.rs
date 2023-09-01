@@ -241,7 +241,7 @@ impl<M: Middleware + 'static + fmt::Debug + Clone> UserOpMiddleware<M> {
             }
             Err(_) => {
                 let error_response: ErrorResponse = serde_json::from_str(&str_response)?;
-                log::info!("Error: {:?}", error_response);
+                log::warn!("Error: {:?}", error_response);
                 let error_message = &error_response.error.message;
 
                 if let Some(captures) =
