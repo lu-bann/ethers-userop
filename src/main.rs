@@ -1,6 +1,7 @@
 use dotenv::dotenv;
 use env_logger::Env;
 use ethers::{
+    contract::abigen,
     prelude::{MiddlewareBuilder, SignerMiddleware},
     providers::{Http, Middleware, Provider},
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
@@ -8,8 +9,9 @@ use ethers::{
     utils::{Geth, GethInstance},
 };
 use ethers_userop::{
+    consts::{GETH_ENTRY_POINT_ADDRESS, RPC_NAMESPACE, SEED_PHRASE},
     gen::{EntryPoint, SimpleAccountFactory},
-    types::{ClientType, DeployedContract, GETH_ENTRY_POINT_ADDRESS, RPC_NAMESPACE, SEED_PHRASE},
+    types::{DeployedContract, SignerType},
 };
 use hashbrown::HashSet;
 use pin_utils::pin_mut;
@@ -37,6 +39,9 @@ use std::{
 use tempdir::TempDir;
 use tracing::{info, warn};
 
+abigen!(WETH, "src/abi/WETH.json",);
+abigen!(ERC20, "src/abi/ERC20.json",);
+
 // Based on https://github.com/Vid201/silius/blob/main/bin/silius/src/silius.rs
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -50,11 +55,13 @@ async fn main() -> anyhow::Result<()> {
     }
 
     dotenv().ok();
-    let (_geth, client) = setup_geth().await?;
+    let (_geth, client): (_, SignerType<Provider<Http>>) = setup_geth().await?;
     let client = Arc::new(client);
     let entry_point = deploy_entry_point(client.clone()).await?;
     let _simple_account_factory =
         deploy_simple_account_factory(client.clone(), entry_point.address).await?;
+    let _erc20 = deploy_weth(client.clone()).await?;
+    let _weth = deploy_weth(client).await?;
 
     let eth_client_address = "http://localhost:8545".to_string();
 
@@ -217,7 +224,7 @@ where
 }
 
 // Based on https://github.com/Vid201/silius/blob/main/tests/src/common/mod.rs
-pub async fn setup_geth() -> anyhow::Result<(GethInstance, ClientType)> {
+pub async fn setup_geth() -> anyhow::Result<(GethInstance, SignerType<Provider<Http>>)> {
     let chain_id: u64 = 1337;
     let tmp_dir = TempDir::new("test_geth")?;
     let wallet = MnemonicBuilder::<English>::default()
@@ -230,8 +237,9 @@ pub async fn setup_geth() -> anyhow::Result<(GethInstance, ClientType)> {
         .port(port)
         .spawn();
 
-    let provider =
-        Provider::<Http>::try_from(geth.endpoint())?.interval(Duration::from_millis(10u64));
+    let provider = Arc::new(
+        Provider::<Http>::try_from(geth.endpoint())?.interval(Duration::from_millis(10u64)),
+    );
 
     let client = SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
         .nonce_manager(wallet.address());
@@ -260,6 +268,21 @@ pub async fn deploy_simple_account_factory<M: Middleware + 'static>(
     let (saf, receipt) = SimpleAccountFactory::deploy(client, ep_addr)?
         .send_with_receipt()
         .await?;
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
+    Ok(DeployedContract::new(saf, addr))
+}
+
+pub async fn deploy_weth<M: Middleware + 'static>(
+    client: Arc<M>,
+) -> anyhow::Result<DeployedContract<WETH<M>>> {
+    let (saf, receipt) = WETH::deploy(client, ())?.send_with_receipt().await?;
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
+    Ok(DeployedContract::new(saf, addr))
+}
+pub async fn deploy_erc20<M: Middleware + 'static>(
+    client: Arc<M>,
+) -> anyhow::Result<DeployedContract<ERC20<M>>> {
+    let (saf, receipt) = ERC20::deploy(client, ())?.send_with_receipt().await?;
     let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(saf, addr))
 }

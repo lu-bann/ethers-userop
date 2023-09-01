@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.72"
-ethers = "2.0.4"
+ethers = "2.0.9"
 silius_primitives = { git = "https://github.com/Vid201/silius.git", rev="33dc6e6", package = "silius-primitives" }
 silius_grpc = { git = "https://github.com/Vid201/silius.git", rev="33dc6e6", package = "silius-grpc" }
 silius_rpc = { git = "https://github.com/Vid201/silius.git", rev="33dc6e6", package = "silius-rpc" }
@@ -16,7 +16,7 @@ hashbrown = "0.14.0"
 async-trait = "0.1.72"
 dirs = "5.0.1"
 expanded-pathbuf = "0.1.2"
-pin-utils = "0.1.0"
+pin-utils = "0.1"
 tokio = "1.31.0"
 tracing = "0.1.37"
 tracing-subscriber = "0.3.17"
@@ -28,6 +28,10 @@ alloy-primitives = "0.2.0"
 alloy-sol-types = "0.2.0"
 env_logger = "0.10.0"
 tempdir = "0.3.7"
+log = "0.4.20"
+rand = "0.8.5"
+parking_lot = "0.12.1"
+regex = "1.9.4"
 
 
 [[bin]]
