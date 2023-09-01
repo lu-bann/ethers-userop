@@ -9,7 +9,7 @@ To start a [Silius](https://github.com/Vid201/silius) bundler with user operatio
 ```bash
 cargo run --bin bundler
 ```
-To run [examples](https://github.com/qi-protocol/ethers-userop/blob/main/src/bin/example.rs)
+To run [examples](https://github.com/qi-protocol/ethers-userop/blob/main/src/bin/example.rs), open a new terminal and 
 ```bash
 cargo run --bin example
 ```
