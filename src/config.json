@@ -1,0 +1,66 @@
+{
+  Bundler {
+      eth_client: "http://localhost:8545",
+      chain_id: 1,
+      entry_point_addr: "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
+      // Largely based on Siliu's config settings: 
+      //https://github.com/Vid201/silius/blob/main/bin/silius/src/cli/commands.rs/ Bundler gRPC port to listen on.
+    BundlerConfig{
+      // Bundler address
+      bundler_address: "localhost",
+      // bundler port
+      bundler_port: 3003,
+      // Bundler EOA wallet seed phrase
+      bundler_seed: "test test test test test test test test test test test junk",
+      // The bundler beneficiary address.
+      beneficiary_address: "localhost",
+      // minimum balance required to run a bundler
+      min_balance: 100000000000000000,
+      // The bundle interval in seconds.
+      bundle_interval: 10,
+      // Sets the send bundle mode. Alternatively, set to `flashbots`
+      send_bundle_mode: "eth-client",
+    },
+    UserOperationPoolConfig {
+      // User operation pool address
+      uo_pool_address: "localhost",
+      // UserOperation pool port
+      uo_pool_port: 3002,
+      // Max allowed verification gas.
+      max_verification_gas: 3000000,
+      // Minimum stake required for entities.
+      min_stake: 1,
+      // Minimum unstake delay for entities.
+      min_unstake_delay: 0,
+      // Minimum priority fee per gas.
+      min_priority_fee_per_gas: 0,
+      // Addresses of whitelisted entities.
+      whitelist: [],
+      // User operation mempool mode
+      uopool_mode: "standard"
+    },
+    RpcConfig {
+      // Enables or disables the HTTP RPC.
+      //
+      // By default, this option is set to true
+      http: true,
+      // Sets the HTTP RPC address to listen on.
+      http_addr: "localhost",
+      // Sets the HTTP RPC port to listen on.
+      http_port: 3000,
+      // Enables or disables the WebSocket RPC.
+      //
+      // By default, this option is set to false.
+      ws: false,
+      // Sets the WS RPC address to listen on.
+      ws_addr: "localhost",
+      // Sets the WS RPC port to listen on.
+      ws_port: 3001,
+    }
+    
+  },
+  Wallet {
+
+  },
+
+}

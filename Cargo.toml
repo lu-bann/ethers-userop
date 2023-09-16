@@ -39,10 +39,6 @@ name = "ethuo"
 path = "src/main.rs"
 
 [[bin]]
-name = "bundler"
-path = "src/bundler.rs"
-
-[[bin]]
 name = "create-smart-contract-wallet"
 path = "src/bin/create_smart_contract_wallet.rs"
 

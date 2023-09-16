@@ -12,7 +12,7 @@ use ethers::{
 use ethers_userop::{
     consts::{GETH_ENTRY_POINT_ADDRESS, RPC_NAMESPACE, SEED_PHRASE},
     gen::{EntryPoint, SimpleAccountFactory},
-    types::{DeployedContract, SignerType},
+    types::{BundlerConfig, DeployedContract, RpcConfig, SignerType, UserOperationPoolConfig},
 };
 use expanded_pathbuf::ExpandedPathBuf;
 use hashbrown::HashSet;
@@ -43,8 +43,15 @@ use tracing::{info, warn};
 abigen!(WETH, "src/abi/WETH.json",);
 abigen!(ERC20, "src/abi/ERC20.json",);
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+pub async fn run_bundler(
+    bundler_config: BundlerConfig,
+    rpc_config: RpcConfig,
+    uopool_config: UserOperationPoolConfig,
+    eth_client_address: String,
+    chain_id: u64,
+    entry_point_address: Address,
+    test: bool,
+) -> anyhow::Result<()> {
     env_logger::Builder::from_env(
         Env::default().default_filter_or("info"), //.default_filter_or("trace")
     )
@@ -54,16 +61,39 @@ async fn main() -> anyhow::Result<()> {
         tracing_subscriber::fmt::init();
     }
 
-    dotenv().ok();
-    let (_geth, client): (_, SignerType<Provider<Http>>) = setup_geth().await?;
-    let client = Arc::new(client);
-    let entry_point = deploy_entry_point(client.clone()).await?;
-    let _simple_account_factory =
-        deploy_simple_account_factory(client.clone(), entry_point.address).await?;
-    let _erc20 = deploy_weth(client.clone()).await?;
-    let _weth = deploy_weth(client).await?;
+    if test {
+        dotenv().ok();
+        let (_geth, client): (_, SignerType<Provider<Http>>) = setup_geth().await?;
+        let client = Arc::new(client);
+        let entry_point = deploy_entry_point(client.clone()).await?;
+        let _simple_account_factory =
+            deploy_simple_account_factory(client.clone(), entry_point.address).await?;
+        let _erc20 = deploy_weth(client.clone()).await?;
+        let _weth = deploy_weth(client).await?;
+    } else {
+        let bundler_address = bundler_config.bundler_address;
+        let bundler_port = bundler_config.bundler_port;
+        let bundler_seed = bundler_config.bundler_seed;
+        let beneficiary_address = bundler_config.beneficiary_address;
+        let min_balance = bundler_config.min_balance;
+        let bundle_interval = bundler_config.bundle_interval;
+        let send_bundle_mode = bundler_config.send_bundle_mode;
 
-    let eth_client_address = "http://localhost:8545".to_string();
+        let uo_pool_address = uopool_config.uo_pool_address;
+        let uo_pool_port = uopool_config.uo_pool_port;
+        let max_verification_gas = uopool_config.max_verification_gas;
+        let min_stake = uopool_config.min_stake;
+        let min_unstake_delay = uopool_config.min_unstake_delay;
+        let min_priority_fee_per_gas = uopool_config.min_priority_fee_per_gas;
+        let whitelist = uopool_config.whitelist;
+
+        let http = rpc_config.http;
+        let http_address = rpc_config.http_addr;
+        let http_port = rpc_config.http_port;
+        let ws = rpc_config.ws;
+        let ws_address = rpc_config.ws_addr;
+        let ws_port = rpc_config.ws_port;
+    }
 
     std::thread::Builder::new()
         .stack_size(128 * 1024 * 1024)
