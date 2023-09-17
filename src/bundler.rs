@@ -6,7 +6,6 @@ use crate::{
 };
 use dirs::home_dir;
 use dotenv::dotenv;
-use env_logger::Env;
 use ethers::{
     contract::abigen,
     prelude::{MiddlewareBuilder, SignerMiddleware},
@@ -53,15 +52,6 @@ pub async fn run_bundler(
     eth_client_address: String,
     entry_point_address: Address,
 ) -> anyhow::Result<()> {
-    env_logger::Builder::from_env(
-        Env::default().default_filter_or("info"), //.default_filter_or("trace")
-    )
-    .init();
-
-    if std::env::var("RUST_LOG").is_ok() {
-        tracing_subscriber::fmt::init();
-    }
-
     // Bundler configs
     let bundler_address = bundler_config.bundler_address;
     let bundler_port = bundler_config.bundler_port;
@@ -229,15 +219,6 @@ pub async fn run_bundler(
 }
 
 pub async fn run_bundler_test() -> anyhow::Result<()> {
-    env_logger::Builder::from_env(
-        Env::default().default_filter_or("info"), //.default_filter_or("trace")
-    )
-    .init();
-
-    if std::env::var("RUST_LOG").is_ok() {
-        tracing_subscriber::fmt::init();
-    }
-
     dotenv().ok();
     let (_geth, client): (_, SignerType<Provider<Http>>) = setup_geth().await?;
     let client = Arc::new(client);
@@ -392,7 +373,7 @@ pub async fn run_bundler_test() -> anyhow::Result<()> {
 /// Runs the future to completion or until:
 /// - `ctrl-c` is received.
 /// - `SIGTERM` is received (unix only).
-async fn run_until_ctrl_c<F, E>(fut: F) -> anyhow::Result<(), E>
+pub(crate) async fn run_until_ctrl_c<F, E>(fut: F) -> anyhow::Result<(), E>
 where
     F: Future<Output = Result<(), E>>,
     E: Send + Sync + 'static + From<std::io::Error>,
@@ -417,7 +398,7 @@ where
 }
 
 // Based on https://github.com/Vid201/silius/blob/main/tests/src/common/mod.rs
-pub async fn setup_geth() -> anyhow::Result<(GethInstance, SignerType<Provider<Http>>)> {
+pub(crate) async fn setup_geth() -> anyhow::Result<(GethInstance, SignerType<Provider<Http>>)> {
     let chain_id: u64 = 1337;
     let tmp_dir = TempDir::new("test_geth")?;
     let wallet = MnemonicBuilder::<English>::default()
@@ -446,7 +427,7 @@ pub async fn setup_geth() -> anyhow::Result<(GethInstance, SignerType<Provider<H
     Ok((geth, client))
 }
 
-pub async fn deploy_entry_point<M: Middleware + 'static>(
+pub(crate) async fn deploy_entry_point<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> anyhow::Result<DeployedContract<EntryPoint<M>>> {
     let (ep, receipt) = EntryPoint::deploy(client, ())?.send_with_receipt().await?;
@@ -454,7 +435,7 @@ pub async fn deploy_entry_point<M: Middleware + 'static>(
     Ok(DeployedContract::new(ep, addr))
 }
 
-pub async fn deploy_simple_account_factory<M: Middleware + 'static>(
+pub(crate) async fn deploy_simple_account_factory<M: Middleware + 'static>(
     client: Arc<M>,
     ep_addr: Address,
 ) -> anyhow::Result<DeployedContract<SimpleAccountFactory<M>>> {
@@ -465,14 +446,15 @@ pub async fn deploy_simple_account_factory<M: Middleware + 'static>(
     Ok(DeployedContract::new(saf, addr))
 }
 
-pub async fn deploy_weth<M: Middleware + 'static>(
+pub(crate) async fn deploy_weth<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> anyhow::Result<DeployedContract<WETH<M>>> {
     let (saf, receipt) = WETH::deploy(client, ())?.send_with_receipt().await?;
     let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(saf, addr))
 }
-pub async fn deploy_erc20<M: Middleware + 'static>(
+#[allow(dead_code)]
+pub(crate) async fn deploy_erc20<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> anyhow::Result<DeployedContract<ERC20<M>>> {
     let (saf, receipt) = ERC20::deploy(client, ())?.send_with_receipt().await?;

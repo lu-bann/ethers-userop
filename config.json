@@ -1,37 +1,37 @@
 {
   "json_bundler_config": {
-      "eth_client": "https://eth.llamarpc.com",
-      "entry_point_address": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
-      "bundler_config": {
-        "bundler_address": "127.0.0.1",
-        "bundler_port": 3003,
-        "bundler_seed": "test test test test test test test test test test test junk",
-        "beneficiary_address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "min_balance": 1,
-        "bundle_interval": 10,
-        "send_bundle_mode": "EthClient"
-      },
-      "user_operation_pool_config": {
-        "uo_pool_address": "127.0.0.1",
-        "uo_pool_port": 3002,
-        "max_verification_gas": 3000000,
-        "min_stake": 1,
-        "min_unstake_delay": 0,
-        "min_priority_fee_per_gas": 0,
-        "whitelist": [],
-        "uopool_mode": "Standard"
-      },
-      "rpc_config": {
-        "http": true,
-        "http_addr": "localhost",
-        "http_port": 3000,
-        "ws": false,
-        "ws_addr": "localhost",
-        "ws_port": 3001
-      }
+    "eth_client": "https://eth.llamarpc.com",
+    "entry_point_address": "0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789",
+    "bundler_config": {
+      "bundler_address": "127.0.0.1",
+      "bundler_port": 3003,
+      "bundler_seed": "test test test test test test test test test test test junk",
+      "beneficiary_address": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+      "min_balance": 1,
+      "bundle_interval": 10,
+      "send_bundle_mode": "EthClient"
+    },
+    "user_operation_pool_config": {
+      "uo_pool_address": "127.0.0.1",
+      "uo_pool_port": 3002,
+      "max_verification_gas": 3000000,
+      "min_stake": 1,
+      "min_unstake_delay": 0,
+      "min_priority_fee_per_gas": 0,
+      "whitelist": [],
+      "uopool_mode": "Standard"
+    },
+    "rpc_config": {
+      "http": true,
+      "http_addr": "localhost",
+      "http_port": 3000,
+      "ws": false,
+      "ws_addr": "localhost",
+      "ws_port": 3001
+    }
   },
   "json_wallet_config": {
-
+    "address_key_map": [
+    ]
   }
-
 }

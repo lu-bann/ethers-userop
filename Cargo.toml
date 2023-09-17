@@ -12,7 +12,7 @@ silius_primitives = { git = "https://github.com/qi-protocol/silius.git", branch=
 silius_grpc = { git = "https://github.com/qi-protocol/silius.git", branch="ethuo", package = "silius-grpc" }
 silius_rpc = { git = "https://github.com/qi-protocol/silius.git", branch="ethuo", package = "silius-rpc" }
 reqwest = "0.11.18"
-hashbrown = "0.14.0"
+hashbrown = {version="0.14.0", features=["serde"]}
 async-trait = "0.1.72"
 dirs = "5.0.1"
 expanded-pathbuf = "0.1.2"
@@ -39,8 +39,8 @@ name = "ethuo"
 path = "src/main.rs"
 
 [[bin]]
-name = "create-smart-contract-wallet"
-path = "src/bin/create_smart_contract_wallet.rs"
+name = "example"
+path = "src/bin/example.rs"
 
 [lib]
 path = "src/lib.rs"

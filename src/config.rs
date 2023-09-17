@@ -1,11 +1,19 @@
 use crate::bundler::{run_bundler, run_bundler_test};
 use anyhow::Ok;
-use clap::{Parser, Subcommand};
-use ethers::types::Address;
+use clap::{value_parser, Parser, Subcommand};
+use ethers::prelude::*;
+use ethers::{
+    signers::{
+        coins_bip39::{English, Mnemonic, Wordlist},
+        MnemonicBuilder,
+    },
+    types::Address,
+};
 use serde::{Deserialize, Serialize};
 use silius_primitives::{bundler::SendBundleMode, uopool::Mode as UoPoolMode};
 use std::fs::File;
 use std::io::Read;
+use std::io::Write;
 use std::net::{IpAddr, Ipv4Addr};
 
 #[derive(Debug, Parser)]
@@ -14,18 +22,35 @@ pub struct Opts {
     /// Command to execute
     #[clap(subcommand)]
     pub sub: Subcommands,
+
+    /// The verbosity level
+    #[clap(long, short, global = true, default_value_t = 2, value_parser = value_parser!(u8).range(..=4))]
+    verbosity: u8,
+}
+
+impl Opts {
+    pub fn get_log_level(&self) -> String {
+        match self.verbosity {
+            0 => "error",
+            1 => "warn",
+            2 => "info",
+            3 => "debug",
+            _ => "trace",
+        }
+        .to_string()
+    }
 }
 
 #[derive(Debug, Subcommand)]
 pub enum Subcommands {
     /// Wallet management utilities.
-    #[clap(name = "wallet", visible_alias = "w")]
+    #[clap(about = "Run Wallet Commands", name = "wallet", visible_alias = "w")]
     Wallet {
         #[clap(subcommand)]
         command: WalletSubcommands,
     },
     /// Bundler management utilities.
-    #[clap(name = "bundler", visible_alias = "b")]
+    #[clap(about = "Run Bundler Commands", name = "bundler", visible_alias = "b")]
     Bundler {
         #[clap(subcommand)]
         command: BundlerSubcommands,
@@ -35,17 +60,39 @@ pub enum Subcommands {
 #[derive(Debug, Parser)]
 pub enum WalletSubcommands {
     /// Generate a new signing key
-    #[clap(name = "new-key", visible_alias = "k")]
-    NewKey {},
+    #[clap(
+        about = "Generate a random key and address",
+        name = "new-key",
+        visible_alias = "k"
+    )]
+    NewKey {
+        #[clap(long)]
+        chain_id: u64,
+    },
     /// Generate a counter-factual address
-    #[clap(name = "new-wallet-address", visible_alias = "nwa")]
-    NewWalletAddress {},
+    #[clap(
+        about = "Generate a counter-factual address",
+        name = "new-wallet-address",
+        visible_alias = "nwa"
+    )]
+    NewWalletAddress {
+        #[clap(long)]
+        salt: u64,
+    },
     /// Deploy a new smart contract wallet
-    #[clap(name = "new-wallet", visible_alias = "nw")]
-    NewWallet {},
+    #[clap(
+        about = "Deploy a new smart contract wallet",
+        name = "new-wallet",
+        visible_alias = "nw"
+    )]
+    NewWallet,
     /// Transfer from a smart contract wallet
-    #[clap(name = "transfer", visible_alias = "t")]
-    Transfer {},
+    #[clap(
+        about = "Send ETH from the smart contract wallet",
+        name = "transfer",
+        visible_alias = "s"
+    )]
+    SendEth,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -63,16 +110,62 @@ struct BundlerJsonConfig {
     rpc_config: RpcConfig,
 }
 
-#[derive(Parser, Serialize, Deserialize, Debug)]
-struct WalletJsonConfig {}
+#[derive(Serialize, Deserialize, Debug)]
+struct WalletJsonConfig {
+    address_key_map: Vec<AddressKeyMapping>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct AddressKeyMapping {
+    address: Address,
+    key: String,
+}
 
 impl WalletSubcommands {
-    pub async fn run(&self) -> anyhow::Result<()> {
+    pub async fn run<W: Wordlist>(&self) -> anyhow::Result<()> {
         match self {
-            WalletSubcommands::NewKey {} => Ok(()),
-            WalletSubcommands::NewWalletAddress {} => Ok(()),
+            WalletSubcommands::NewKey { chain_id } => {
+                let mut rng = rand::thread_rng();
+                let mnemonic = Mnemonic::<W>::new(&mut rng);
+                let str_mnemonic = mnemonic.to_phrase();
+                let wallet = MnemonicBuilder::<English>::default()
+                    .phrase(PathOrString::String(str_mnemonic.clone()))
+                    .build()?
+                    .with_chain_id(*chain_id);
+                let address = wallet.address();
+                println!(
+                    "Generated Wallet with Address: {}, Mnemonic Phrase: {}, Chain Id: {}",
+                    address, str_mnemonic, chain_id
+                );
+
+                // open the config.json and load the content
+                let mut file = File::open("config.json")?;
+                let mut content = String::new();
+                file.read_to_string(&mut content)?;
+                let mut config: Config =
+                    serde_json::from_str(&content).expect("JSON was not well-formatted");
+
+                // update the `address_key_map`
+                config
+                    .json_wallet_config
+                    .address_key_map
+                    .push(AddressKeyMapping {
+                        address,
+                        key: str_mnemonic,
+                    });
+                let updated_config_str = serde_json::to_string_pretty(&config)
+                    .expect("Failed to serialize the updated config");
+
+                // Write to the config.json
+                let mut file = File::create("config.json").expect("Unable to find config.json");
+                file.write_all(updated_config_str.as_bytes())
+                    .expect("Unable to write data");
+
+                Ok(())
+            }
+            WalletSubcommands::NewWalletAddress { salt: _ } => Ok(()),
             WalletSubcommands::NewWallet {} => Ok(()),
-            WalletSubcommands::Transfer {} => Ok(()),
+            WalletSubcommands::SendEth {} => Ok(()),
         }
     }
 }
@@ -94,7 +187,8 @@ impl BundlerSubcommands {
                 let mut file = File::open("config.json")?;
                 let mut content = String::new();
                 file.read_to_string(&mut content)?;
-                let config: Config = serde_json::from_str(&content)?;
+                let config: Config =
+                    serde_json::from_str(&content).expect("JSON was not well-formatted");
 
                 let bundler_config = BundlerConfig {
                     bundler_address: config.json_bundler_config.bundler_config.bundler_address,

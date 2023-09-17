@@ -1,5 +1,6 @@
 pub mod bundler;
-pub mod config;
+#[allow(dead_code)]
+mod config;
 pub mod consts;
 #[allow(dead_code)]
 mod errors;
