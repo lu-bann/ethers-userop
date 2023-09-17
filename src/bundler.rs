@@ -1,3 +1,9 @@
+use crate::{
+    config::{BundlerConfig, RpcConfig, UserOperationPoolConfig},
+    consts::{GETH_ENTRY_POINT_ADDRESS, RPC_NAMESPACE, SEED_PHRASE},
+    gen::{EntryPoint, SimpleAccountFactory},
+    types::{DeployedContract, SignerType},
+};
 use dirs::home_dir;
 use dotenv::dotenv;
 use env_logger::Env;
@@ -9,11 +15,6 @@ use ethers::{
     types::{Address, TransactionRequest, U256},
     utils::{Geth, GethInstance},
 };
-use ethers_userop::{
-    consts::{GETH_ENTRY_POINT_ADDRESS, RPC_NAMESPACE, SEED_PHRASE},
-    gen::{EntryPoint, SimpleAccountFactory},
-    types::{BundlerConfig, DeployedContract, RpcConfig, SignerType, UserOperationPoolConfig},
-};
 use expanded_pathbuf::ExpandedPathBuf;
 use hashbrown::HashSet;
 use pin_utils::pin_mut;
@@ -21,7 +22,9 @@ use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
     uopool_service_run,
 };
-use silius_primitives::{bundler::SendBundleMode, Chain, UoPoolMode, Wallet};
+use silius_primitives::{
+    bundler::SendBundleMode, consts::flashbots_relay_endpoints, Chain, UoPoolMode, Wallet,
+};
 use silius_rpc::{
     eth_api::{EthApiServer, EthApiServerImpl},
     JsonRpcServer, JsonRpcServerType,
@@ -48,9 +51,7 @@ pub async fn run_bundler(
     rpc_config: RpcConfig,
     uopool_config: UserOperationPoolConfig,
     eth_client_address: String,
-    chain_id: u64,
     entry_point_address: Address,
-    test: bool,
 ) -> anyhow::Result<()> {
     env_logger::Builder::from_env(
         Env::default().default_filter_or("info"), //.default_filter_or("trace")
@@ -61,40 +62,192 @@ pub async fn run_bundler(
         tracing_subscriber::fmt::init();
     }
 
-    if test {
-        dotenv().ok();
-        let (_geth, client): (_, SignerType<Provider<Http>>) = setup_geth().await?;
-        let client = Arc::new(client);
-        let entry_point = deploy_entry_point(client.clone()).await?;
-        let _simple_account_factory =
-            deploy_simple_account_factory(client.clone(), entry_point.address).await?;
-        let _erc20 = deploy_weth(client.clone()).await?;
-        let _weth = deploy_weth(client).await?;
-    } else {
-        let bundler_address = bundler_config.bundler_address;
-        let bundler_port = bundler_config.bundler_port;
-        let bundler_seed = bundler_config.bundler_seed;
-        let beneficiary_address = bundler_config.beneficiary_address;
-        let min_balance = bundler_config.min_balance;
-        let bundle_interval = bundler_config.bundle_interval;
-        let send_bundle_mode = bundler_config.send_bundle_mode;
+    // Bundler configs
+    let bundler_address = bundler_config.bundler_address;
+    let bundler_port = bundler_config.bundler_port;
+    let bundler_seed = bundler_config.bundler_seed;
+    let beneficiary_address = bundler_config.beneficiary_address;
+    let min_balance = U256::from(bundler_config.min_balance);
+    let bundle_interval = bundler_config.bundle_interval;
+    let send_bundle_mode = bundler_config.send_bundle_mode;
 
-        let uo_pool_address = uopool_config.uo_pool_address;
-        let uo_pool_port = uopool_config.uo_pool_port;
-        let max_verification_gas = uopool_config.max_verification_gas;
-        let min_stake = uopool_config.min_stake;
-        let min_unstake_delay = uopool_config.min_unstake_delay;
-        let min_priority_fee_per_gas = uopool_config.min_priority_fee_per_gas;
-        let whitelist = uopool_config.whitelist;
+    // UserOperationPool configs
+    let uo_pool_address = uopool_config.uo_pool_address;
+    let uo_pool_port = uopool_config.uo_pool_port;
+    let max_verification_gas = uopool_config.max_verification_gas;
+    let min_stake = uopool_config.min_stake;
+    let min_unstake_delay = uopool_config.min_unstake_delay;
+    let min_priority_fee_per_gas = uopool_config.min_priority_fee_per_gas;
+    let whitelist = uopool_config.whitelist;
+    let uopool_mode = uopool_config.uopool_mode;
 
-        let http = rpc_config.http;
-        let http_address = rpc_config.http_addr;
-        let http_port = rpc_config.http_port;
-        let ws = rpc_config.ws;
-        let ws_address = rpc_config.ws_addr;
-        let ws_port = rpc_config.ws_port;
+    // RPC configs
+    let http = rpc_config.http;
+    let http_addr = rpc_config.http_addr;
+    let http_port = rpc_config.http_port;
+    let ws = rpc_config.ws;
+    let _ws_addr = rpc_config.ws_addr;
+    let ws_port = rpc_config.ws_port;
+
+    std::thread::Builder::new()
+        .stack_size(128 * 1024 * 1024)
+        .spawn(move || {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_stack_size(128 * 1024 * 1024)
+                .build()?;
+
+            let task = async move {
+                info!("Starting Silius Bundler");
+
+                let eth_client = Arc::new(Provider::<Http>::try_from(eth_client_address.clone())?);
+                info!(
+                    "Connected to the Ethereum execution client at {}: {}",
+                    eth_client_address.clone(),
+                    eth_client.client_version().await?
+                );
+
+                let chain_id = eth_client.get_chainid().await?;
+                let chain = Chain::from(chain_id);
+
+                let fb_or_eth = match send_bundle_mode {
+                    SendBundleMode::EthClient => false,
+                    SendBundleMode::Flashbots => true,
+                };
+                let wallet = Wallet::from_phrase(&bundler_seed, &chain_id, fb_or_eth)?;
+
+                let datadir = home_dir()
+                    .map(|h| h.join(".silius"))
+                    .ok_or_else(|| anyhow::anyhow!("Get Home directory error"))
+                    .map(ExpandedPathBuf)?;
+
+                let uopool_grpc_listen_address: SocketAddr =
+                    SocketAddr::new(uo_pool_address, uo_pool_port);
+                info!("Starting uopool gRPC service...");
+                uopool_service_run(
+                    uopool_grpc_listen_address,
+                    datadir,
+                    vec![entry_point_address],
+                    eth_client,
+                    chain,
+                    max_verification_gas.into(),
+                    min_stake.into(),
+                    min_unstake_delay.into(),
+                    min_priority_fee_per_gas.into(),
+                    whitelist,
+                    uopool_mode,
+                )
+                .await?;
+                info!(
+                    "Started uopool gRPC service at {:}",
+                    uopool_grpc_listen_address
+                );
+
+                info!("Connecting to uopool gRPC service");
+                let uopool_grpc_client =
+                    UoPoolClient::connect(format!("http://{}", uopool_grpc_listen_address)).await?;
+                info!("Connected to uopool gRPC service");
+
+                let bundler_grpc_listen_address: SocketAddr =
+                    SocketAddr::new(bundler_address, bundler_port);
+                info!("Starting bundler gRPC service...");
+                bundler_service_run(
+                    bundler_grpc_listen_address,
+                    wallet.clone(),
+                    vec![entry_point_address],
+                    eth_client_address.clone(),
+                    chain,
+                    beneficiary_address,
+                    min_balance,
+                    bundle_interval,
+                    uopool_grpc_client.clone(),
+                    send_bundle_mode,
+                    match send_bundle_mode {
+                        SendBundleMode::EthClient => None,
+                        SendBundleMode::Flashbots => {
+                            Some(vec![flashbots_relay_endpoints::FLASHBOTS.to_string()])
+                        }
+                    },
+                );
+                info!(
+                    "Started bundler gRPC service at {:}",
+                    bundler_grpc_listen_address
+                );
+
+                info!("Starting bundler JSON-RPC server...");
+                tokio::spawn({
+                    async move {
+                        let _api: HashSet<String> = HashSet::from_iter(
+                            RPC_NAMESPACE
+                                .map(|s| s.to_string())
+                                .into_iter()
+                                .collect::<Vec<String>>(),
+                        );
+
+                        let mut server = JsonRpcServer::new(
+                            http,
+                            IpAddr::V4(Ipv4Addr::LOCALHOST),
+                            http_port,
+                            ws,
+                            IpAddr::V4(Ipv4Addr::LOCALHOST),
+                            ws_port,
+                        )
+                        .with_proxy(eth_client_address.to_string())
+                        .with_cors(&vec!["*".to_string()], JsonRpcServerType::Http)
+                        .with_cors(&vec!["*".to_string()], JsonRpcServerType::Ws);
+
+                        server.add_methods(
+                            EthApiServerImpl {
+                                uopool_grpc_client: uopool_grpc_client.clone(),
+                            }
+                            .into_rpc(),
+                            JsonRpcServerType::Http,
+                        )?;
+
+                        let _bundler_grpc_client = BundlerClient::connect(format!(
+                            "http://{}",
+                            uopool_grpc_listen_address
+                        ))
+                        .await?;
+
+                        let _handle = server.start().await?;
+                        info!(
+                            "Started bundler JSON-RPC server at {:}:{:}",
+                            http_addr, http_port
+                        );
+
+                        pending::<anyhow::Result<()>>().await
+                    }
+                });
+                pending::<anyhow::Result<()>>().await
+            };
+            rt.block_on(run_until_ctrl_c::<_, anyhow::Error>(task))?;
+            Ok(())
+        })?
+        .join()
+        .unwrap_or_else(|e| panic::resume_unwind(e))
+}
+
+pub async fn run_bundler_test() -> anyhow::Result<()> {
+    env_logger::Builder::from_env(
+        Env::default().default_filter_or("info"), //.default_filter_or("trace")
+    )
+    .init();
+
+    if std::env::var("RUST_LOG").is_ok() {
+        tracing_subscriber::fmt::init();
     }
 
+    dotenv().ok();
+    let (_geth, client): (_, SignerType<Provider<Http>>) = setup_geth().await?;
+    let client = Arc::new(client);
+    let entry_point = deploy_entry_point(client.clone()).await?;
+    let _simple_account_factory =
+        deploy_simple_account_factory(client.clone(), entry_point.address).await?;
+    let _erc20 = deploy_weth(client.clone()).await?;
+    let _weth = deploy_weth(client).await?;
+
+    let eth_client_address = "http://localhost:8545".to_string();
     std::thread::Builder::new()
         .stack_size(128 * 1024 * 1024)
         .spawn(move || {
