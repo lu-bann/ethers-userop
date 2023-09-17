@@ -5,17 +5,22 @@ mod config;
 #[allow(dead_code)]
 mod consts;
 #[allow(dead_code)]
+mod errors;
+#[allow(dead_code)]
 mod gen;
 mod traits;
 #[allow(dead_code)]
 mod types;
+#[allow(dead_code)]
+mod uo_builder;
+#[allow(dead_code)]
+mod userop_middleware;
 
 use crate::bundler::run_until_ctrl_c;
 use anyhow::Ok;
 use clap::Parser;
 use config::Opts;
 use config::Subcommands;
-use ethers::signers::coins_bip39::English;
 use std::panic;
 
 #[tokio::main]
@@ -40,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
                         Ok(())
                     }
                     Subcommands::Wallet { command } => {
-                        command.run::<English>().await?;
+                        command.run().await?;
                         Ok(())
                     }
                 }

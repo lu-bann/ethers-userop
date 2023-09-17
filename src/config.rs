@@ -1,15 +1,18 @@
 use crate::bundler::{run_bundler, run_bundler_test};
+use crate::userop_middleware::UserOpMiddleware;
 use anyhow::Ok;
 use clap::{value_parser, Parser, Subcommand};
 use ethers::prelude::*;
 use ethers::{
+    providers::{Http, Provider},
     signers::{
-        coins_bip39::{English, Mnemonic, Wordlist},
+        coins_bip39::{English, Mnemonic},
         MnemonicBuilder,
     },
     types::Address,
 };
 use serde::{Deserialize, Serialize};
+use silius_primitives::Wallet as UoWallet;
 use silius_primitives::{bundler::SendBundleMode, uopool::Mode as UoPoolMode};
 use std::fs::File;
 use std::io::Read;
@@ -77,7 +80,11 @@ pub enum WalletSubcommands {
     )]
     NewWalletAddress {
         #[clap(long)]
+        wallet_name: String,
+        #[clap(long)]
         salt: u64,
+        #[clap(long)]
+        source_address: Address,
     },
     /// Deploy a new smart contract wallet
     #[clap(
@@ -95,13 +102,13 @@ pub enum WalletSubcommands {
     SendEth,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct Config {
     json_bundler_config: BundlerJsonConfig,
     json_wallet_config: WalletJsonConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct BundlerJsonConfig {
     eth_client: String,
     entry_point_address: Address,
@@ -110,23 +117,26 @@ struct BundlerJsonConfig {
     rpc_config: RpcConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct WalletJsonConfig {
     address_key_map: Vec<AddressKeyMapping>,
+    address_scw_map: hashbrown::HashMap<Address, Vec<Address>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct AddressKeyMapping {
     address: Address,
     key: String,
+    chain_id: u64,
+    deployed_smart_contract_wallet: Vec<Address>,
 }
 
 impl WalletSubcommands {
-    pub async fn run<W: Wordlist>(&self) -> anyhow::Result<()> {
+    pub async fn run(&self) -> anyhow::Result<()> {
         match self {
             WalletSubcommands::NewKey { chain_id } => {
                 let mut rng = rand::thread_rng();
-                let mnemonic = Mnemonic::<W>::new(&mut rng);
+                let mnemonic = Mnemonic::<English>::new(&mut rng);
                 let str_mnemonic = mnemonic.to_phrase();
                 let wallet = MnemonicBuilder::<English>::default()
                     .phrase(PathOrString::String(str_mnemonic.clone()))
@@ -135,7 +145,7 @@ impl WalletSubcommands {
                 let address = wallet.address();
                 println!(
                     "Generated Wallet with Address: {}, Mnemonic Phrase: {}, Chain Id: {}",
-                    address, str_mnemonic, chain_id
+                    &address, &str_mnemonic, &chain_id
                 );
 
                 // open the config.json and load the content
@@ -152,6 +162,8 @@ impl WalletSubcommands {
                     .push(AddressKeyMapping {
                         address,
                         key: str_mnemonic,
+                        chain_id: *chain_id,
+                        deployed_smart_contract_wallet: vec![],
                     });
                 let updated_config_str = serde_json::to_string_pretty(&config)
                     .expect("Failed to serialize the updated config");
@@ -163,7 +175,86 @@ impl WalletSubcommands {
 
                 Ok(())
             }
-            WalletSubcommands::NewWalletAddress { salt: _ } => Ok(()),
+            WalletSubcommands::NewWalletAddress {
+                wallet_name,
+                salt,
+                source_address,
+            } => {
+                // Load config.json
+                let mut file = File::open("config.json")?;
+                let mut content = String::new();
+                file.read_to_string(&mut content)?;
+                let mut config: Config =
+                    serde_json::from_str(&content).expect("JSON was not well-formatted");
+
+                let eth_client_address = config.clone().json_bundler_config.eth_client;
+                let entry_point_address = config.clone().json_bundler_config.entry_point_address;
+
+                // TODO: add  Ws support
+                let rpc_addr = config.clone().json_bundler_config.rpc_config.http_addr;
+                let port = config.clone().json_bundler_config.rpc_config.http_port;
+
+                // Match the user input against the `address_key_map` in config.json
+                let search_result = config
+                    .json_wallet_config
+                    .address_key_map
+                    .iter()
+                    .find(|&entry| entry.address == *source_address)
+                    .map(|entry| {
+                        return (
+                            entry.address.clone(),
+                            entry.key.clone(),
+                            entry.chain_id.clone(),
+                        );
+                    });
+
+                // Return the matching result. If not found return error
+                let (address, key, chain_id) = match search_result {
+                    Some((addr, k, c)) => (addr, k, c),
+                    None => Err(anyhow::anyhow!(
+                        "Entered address not found in the config.json"
+                    ))?,
+                };
+
+                // Build a UoWallet from the found key
+                let uo_wallet =
+                    UoWallet::from_phrase(key.as_str(), &U256::from(chain_id), false).unwrap();
+                let provider = Provider::<Http>::try_from(eth_client_address.to_string())?;
+                let rpc_address = format!("http://{}:{}", rpc_addr, port);
+
+                // Instantiate a UserOpMiddleware
+                let uo_middleware: UserOpMiddleware<Provider<_>> = UserOpMiddleware::new(
+                    provider,
+                    entry_point_address,
+                    rpc_address,
+                    uo_wallet.clone(),
+                );
+
+                let uo_builder = uo_middleware
+                    .create_scw_deployment_uo(wallet_name.into(), *salt)
+                    .await?;
+                let scw_address = uo_builder.scw_address().unwrap();
+                println!(
+                    "Smart contract wallet counter-factual address: 0x{:x}",
+                    scw_address
+                );
+
+                config
+                    .json_wallet_config
+                    .address_scw_map
+                    .entry(address.clone())
+                    .or_insert_with(Vec::new)
+                    .push(scw_address);
+                let updated_config_str = serde_json::to_string_pretty(&config)
+                    .expect("Failed to serialize the updated config");
+
+                // Write to the config.json
+                let mut file = File::create("config.json").expect("Unable to find config.json");
+                file.write_all(updated_config_str.as_bytes())
+                    .expect("Unable to write data");
+
+                Ok(())
+            }
             WalletSubcommands::NewWallet {} => Ok(()),
             WalletSubcommands::SendEth {} => Ok(()),
         }

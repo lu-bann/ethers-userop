@@ -32,6 +32,17 @@
   },
   "json_wallet_config": {
     "address_key_map": [
-    ]
+      {
+        "address": "0x715ba3508ba7ec16843ec8a1b1d384aa183a1f28",
+        "key": "hill coil trophy flower glue insane inherit soap picnic forest empower language",
+        "chain_id": 1337,
+        "deployed_smart_contract_wallet": []
+      }
+    ],
+    "address_scw_map": {
+      "0x715ba3508ba7ec16843ec8a1b1d384aa183a1f28": [
+        "0xf04fec79dc4cdf2d3dfc25705aa940f0e4b7a22c"
+      ]
+    }
   }
 }

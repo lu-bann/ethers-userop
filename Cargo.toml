@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.72"
-ethers = "2.0.8"
+ethers = { version="2.0.8", features=["ws"] }
 silius_primitives = { git = "https://github.com/qi-protocol/silius.git", branch="ethuo", package = "silius-primitives" }
 silius_grpc = { git = "https://github.com/qi-protocol/silius.git", branch="ethuo", package = "silius-grpc" }
 silius_rpc = { git = "https://github.com/qi-protocol/silius.git", branch="ethuo", package = "silius-rpc" }
