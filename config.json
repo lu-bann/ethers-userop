@@ -37,11 +37,18 @@
         "key": "hill coil trophy flower glue insane inherit soap picnic forest empower language",
         "chain_id": 1337,
         "deployed_smart_contract_wallet": []
+      },
+      {
+        "address": "0x4805d2f67812e0026ee7a36ca2a2c039218b4798",
+        "key": "text online exact this scout happy convince subway envelope country joke disagree",
+        "chain_id": 1337,
+        "deployed_smart_contract_wallet": []
       }
     ],
     "address_scw_map": {
       "0x715ba3508ba7ec16843ec8a1b1d384aa183a1f28": [
-        "0xf04fec79dc4cdf2d3dfc25705aa940f0e4b7a22c"
+        "0xf04fec79dc4cdf2d3dfc25705aa940f0e4b7a22c",
+        "0x2799ee23a541e7f8b5bf12e9751a61f0fc427430"
       ]
     }
   }
