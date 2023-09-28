@@ -9,6 +9,7 @@ use ethers::{
     types::{Address, Bytes, U256},
 };
 use silius_primitives::{UserOperation, UserOperationHash, UserOperationPartial};
+use std::str::FromStr;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -42,9 +43,9 @@ impl<M: Middleware> Clone for UserOperationBuilder<M> {
             wallet_contract: self.wallet_contract.clone_box(),
             scw_address: self.scw_address,
             signer_address: self.signer_address,
-            salt: self.salt.clone(),
+            salt: self.salt,
             uo: self.uo.clone(),
-            uo_hash: self.uo_hash.clone(),
+            uo_hash: self.uo_hash,
         }
     }
 }
@@ -123,6 +124,7 @@ impl<M: Middleware + 'static> UserOperationBuilder<M> {
     /// * `Box<dyn SmartWalletAccount>` - The smart contract wallet contract object
     /// * `Box<dyn SmartWalletAccountFactory<M>>` - The smart contract wallet factory contract object
     /// * `Address` - The smart contract wallet factory contract address
+    #[allow(clippy::type_complexity)]
     fn match_wallet(
         wallet_name: String,
         provider: Arc<M>,
@@ -134,15 +136,14 @@ impl<M: Middleware + 'static> UserOperationBuilder<M> {
         let (factory_contract, factory_address): (Box<dyn SmartWalletAccountFactory<M>>, Address) =
             match WalletFactoryRegistry::from_str(&wallet_name)? {
                 WalletFactoryRegistry::SimpleAccountFactory(addr) => {
-                    let wf = Box::new(SimpleAccountFactory::new(addr.clone(), provider.clone()));
+                    let wf = Box::new(SimpleAccountFactory::new(addr, provider.clone()));
                     (wf, addr)
                 }
             };
         let wallet_contract: Box<dyn SmartWalletAccount> =
             match WalletRegistry::from_str(&wallet_name)? {
                 WalletRegistry::SimpleAccount => {
-                    let wf = Box::new(SimpleAccount::new(factory_address, provider.clone()));
-                    wf
+                    Box::new(SimpleAccount::new(factory_address, provider.clone())) as _
                 }
             };
         Ok((wallet_contract, factory_contract, factory_address))
@@ -378,65 +379,65 @@ impl<M: Middleware + 'static> UserOperationBuilder<M> {
     /// # Return
     /// * `UserOperation` - The [UserOperation](silius_primitives::UserOperation) to be sent
     pub fn build_uo(&self) -> anyhow::Result<UserOperation> {
-        if let None = self.uo.sender {
+        if self.uo.sender.is_none() {
             return Err(anyhow::anyhow!(
                 UserOpBuilderError::<M>::MissingUserOperationField("sender".to_string())
             ));
         };
-        if let None = self.uo.nonce {
+        if self.uo.nonce.is_none() {
             return Err(anyhow::anyhow!(
                 UserOpBuilderError::<M>::MissingUserOperationField("nonce".to_string())
             ));
         };
-        if let None = self.uo.init_code {
+        if self.uo.init_code.is_none() {
             return Err(anyhow::anyhow!(
                 UserOpBuilderError::<M>::MissingUserOperationField("init_code".to_string())
             ));
         };
-        if let None = self.uo.call_data {
+        if self.uo.call_data.is_none() {
             return Err(anyhow::anyhow!(
                 UserOpBuilderError::<M>::MissingUserOperationField("call_data".to_string())
             ));
         };
-        if let None = self.uo.call_gas_limit {
+        if self.uo.call_gas_limit.is_none() {
             return Err(anyhow::anyhow!(
                 UserOpBuilderError::<M>::MissingUserOperationField("call_gas_limit".to_string())
             ));
         };
-        if let None = self.uo.pre_verification_gas {
+        if self.uo.pre_verification_gas.is_none() {
             return Err(anyhow::anyhow!(
                 UserOpBuilderError::<M>::MissingUserOperationField(
                     "pre_verification_gas".to_string()
                 )
             ));
         };
-        if let None = self.uo.verification_gas_limit {
+        if self.uo.verification_gas_limit.is_none() {
             return Err(anyhow::anyhow!(
                 UserOpBuilderError::<M>::MissingUserOperationField(
                     "verification_gas_limit".to_string()
                 )
             ));
         };
-        if let None = self.uo.max_priority_fee_per_gas {
+        if self.uo.max_priority_fee_per_gas.is_none() {
             return Err(anyhow::anyhow!(
                 UserOpBuilderError::<M>::MissingUserOperationField(
                     "max_priority_fee_per_gas".to_string()
                 )
             ));
         };
-        if let None = self.uo.max_fee_per_gas {
+        if self.uo.max_fee_per_gas.is_none() {
             return Err(anyhow::anyhow!(
                 UserOpBuilderError::<M>::MissingUserOperationField("max_fee_per_gas".to_string())
             ));
         };
-        if let None = self.uo.paymaster_and_data {
+        if self.uo.paymaster_and_data.is_none() {
             return Err(anyhow::anyhow!(
                 UserOpBuilderError::<M>::MissingUserOperationField(
                     "paymaster_and_data".to_string()
                 )
             ));
         };
-        if let None = self.uo.signature {
+        if self.uo.signature.is_none() {
             return Err(anyhow::anyhow!(
                 UserOpBuilderError::<M>::MissingUserOperationField("signature".to_string())
             ));

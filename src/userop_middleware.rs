@@ -241,7 +241,7 @@ impl<M: Middleware + 'static + fmt::Debug + Clone> UserOpMiddleware<M> {
             }
             Err(_) => {
                 let error_response: ErrorResponse = serde_json::from_str(&str_response)?;
-                log::info!("Error: {:?}", error_response);
+                log::warn!("Error: {:?}", error_response);
                 let error_message = &error_response.error.message;
 
                 if let Some(captures) =
@@ -256,10 +256,9 @@ impl<M: Middleware + 'static + fmt::Debug + Clone> UserOpMiddleware<M> {
                     ));
                 }
 
-                if let Some(captures) = 
-                    Regex::new(r"Pre-verification gas (\d+) is lower than calculated pre-verification gas (\d+)")
+                if let Some(captures) = Regex::new(r"Pre-verification gas (\d+) is lower than calculated pre-verification gas (\d+)")
                         .unwrap()
-                        .captures(error_message) 
+                        .captures(error_message)
                 {
                     let pre_verification_gas: u64 = captures[1].parse().unwrap();
                     let calculated_gas: u64 = captures[2].parse().unwrap();
@@ -274,9 +273,7 @@ impl<M: Middleware + 'static + fmt::Debug + Clone> UserOpMiddleware<M> {
                     ));
                 }
 
-                Err(anyhow::anyhow!(
-                    UserOpMiddlewareError::<M>::UnknownError
-                ))
+                Err(anyhow::anyhow!(UserOpMiddlewareError::<M>::UnknownError))
             }
         }
     }
@@ -344,30 +341,27 @@ impl<M: Middleware + 'static + fmt::Debug + Clone> UserOpMiddleware<M> {
 
         let mut pre_verification_gas = estimate_result.result.pre_verification_gas;
         let mut call_gas_limit = estimate_result.result.call_gas_limit;
-        let mut verification_gas_limit = estimate_result.result.verification_gas_limit.saturating_add(U256::from(10000));
+        let mut verification_gas_limit = estimate_result
+            .result
+            .verification_gas_limit
+            .saturating_add(U256::from(10000));
         let mut uo_hash = None;
 
-        while uo_builder.uo_hash().is_none(){
+        while uo_builder.uo_hash().is_none() {
             uo_builder
-                .set_uo_pre_verification_gas(
-                    pre_verification_gas
-                )
-                .set_uo_call_gas_limit(
-                    call_gas_limit
-                )
-                .set_uo_verification_gas_limit(
-                    verification_gas_limit
-                )
-                .set_uo_max_fee_per_gas(gas_price.into())
-                .set_uo_max_priority_fee_per_gas(priority_fee.into());
+                .set_uo_pre_verification_gas(pre_verification_gas)
+                .set_uo_call_gas_limit(call_gas_limit)
+                .set_uo_verification_gas_limit(verification_gas_limit)
+                .set_uo_max_fee_per_gas(gas_price)
+                .set_uo_max_priority_fee_per_gas(priority_fee);
 
             let uo = uo_builder.build_uo()?;
             let signed_uo = self.sign_uo(uo.clone()).await?;
-            
+
             match self.send_user_operation(&signed_uo).await {
                 Ok(success_response) => {
                     uo_hash = Some(success_response);
-                    let _ = uo_builder.set_uo_hash(uo_hash.as_ref().unwrap().result.clone());
+                    let _ = uo_builder.set_uo_hash(uo_hash.as_ref().unwrap().result);
                 }
                 Err(err) => {
                     if let Some(custom_err) = err.downcast_ref::<UserOpMiddlewareError<M>>() {
@@ -376,7 +370,10 @@ impl<M: Middleware + 'static + fmt::Debug + Clone> UserOpMiddleware<M> {
                                 call_gas_limit = U256::from(*estimation); // Set the call_gas_limit to the estimated value
                                 log::warn!("Call gas limit is not enough. Retry with call_gas_limit increased to {}", &estimation);
                             }
-                            UserOpMiddlewareError::PreVerificationGasError(_pre_verification, calculated) => {
+                            UserOpMiddlewareError::PreVerificationGasError(
+                                _pre_verification,
+                                calculated,
+                            ) => {
                                 pre_verification_gas = U256::from(*calculated); // Set the pre_verification_gas to the calculated value
                                 log::warn!("Pre-verification gas is not enough. Retry with pre_verification_gas increased to {}", &calculated);
                             }
@@ -462,14 +459,14 @@ impl<M: Middleware + 'static + fmt::Debug + Clone> UserOpMiddleware<M> {
     ) -> anyhow::Result<UserOperationBuilder<M>> {
         let sender_address = self.wallet.signer.address();
         let salt = rand::thread_rng().gen::<u64>();
-        let uo_builder = UserOperationBuilder::new(
+
+        UserOperationBuilder::new(
             sender_address,
             wallet_name,
             None,
             self.inner.clone().into(),
             Some(salt),
-        );
-        uo_builder
+        )
     }
 
     /// API to generates a random counter factual address
@@ -577,30 +574,27 @@ impl<M: Middleware + 'static + fmt::Debug + Clone> UserOpMiddleware<M> {
 
         let mut pre_verification_gas = estimate_result.result.pre_verification_gas;
         let mut call_gas_limit = estimate_result.result.call_gas_limit;
-        let mut verification_gas_limit = estimate_result.result.verification_gas_limit.saturating_add(U256::from(10000));
+        let mut verification_gas_limit = estimate_result
+            .result
+            .verification_gas_limit
+            .saturating_add(U256::from(10000));
         let mut uo_hash = None;
 
-        while uo_builder.uo_hash().is_none(){
+        while uo_builder.uo_hash().is_none() {
             uo_builder
-                .set_uo_pre_verification_gas(
-                    pre_verification_gas
-                )
-                .set_uo_call_gas_limit(
-                    call_gas_limit
-                )
-                .set_uo_verification_gas_limit(
-                    verification_gas_limit
-                )
-                .set_uo_max_fee_per_gas(gas_price.into())
-                .set_uo_max_priority_fee_per_gas(priority_fee.into());
+                .set_uo_pre_verification_gas(pre_verification_gas)
+                .set_uo_call_gas_limit(call_gas_limit)
+                .set_uo_verification_gas_limit(verification_gas_limit)
+                .set_uo_max_fee_per_gas(gas_price)
+                .set_uo_max_priority_fee_per_gas(priority_fee);
 
             let uo = uo_builder.build_uo()?;
             let signed_uo = self.sign_uo(uo.clone()).await?;
-            
+
             match self.send_user_operation(&signed_uo).await {
                 Ok(success_response) => {
                     uo_hash = Some(success_response);
-                    let _ = uo_builder.set_uo_hash(uo_hash.as_ref().unwrap().result.clone());
+                    let _ = uo_builder.set_uo_hash(uo_hash.as_ref().unwrap().result);
                 }
                 Err(err) => {
                     if let Some(custom_err) = err.downcast_ref::<UserOpMiddlewareError<M>>() {
@@ -609,7 +603,10 @@ impl<M: Middleware + 'static + fmt::Debug + Clone> UserOpMiddleware<M> {
                                 call_gas_limit = U256::from(*estimation); // Set the call_gas_limit to the estimated value
                                 log::warn!("Call gas limit is not enough. Retry with call_gas_limit increased to {}", &estimation);
                             }
-                            UserOpMiddlewareError::PreVerificationGasError(_pre_verification, calculated) => {
+                            UserOpMiddlewareError::PreVerificationGasError(
+                                _pre_verification,
+                                calculated,
+                            ) => {
                                 pre_verification_gas = U256::from(*calculated); // Set the pre_verification_gas to the calculated value
                                 log::warn!("Pre-verification gas is not enough. Retry with pre_verification_gas increased to {}", &calculated);
                             }
@@ -628,7 +625,6 @@ impl<M: Middleware + 'static + fmt::Debug + Clone> UserOpMiddleware<M> {
             }
         }
         let uo_hash = uo_hash.unwrap();
-
 
         Ok(uo_hash)
     }
@@ -691,14 +687,14 @@ impl<M: Middleware + 'static + fmt::Debug + Clone> UserOpMiddleware<M> {
                     .saturating_mul(U256::from(2)),
             )
             .set_uo_verification_gas_limit(estimate_result.result.verification_gas_limit)
-            .set_uo_max_fee_per_gas(gas_price.into())
-            .set_uo_max_priority_fee_per_gas(priority_fee.into());
+            .set_uo_max_fee_per_gas(gas_price)
+            .set_uo_max_priority_fee_per_gas(priority_fee);
 
         let uo = uo_builder.build_uo()?;
         let signed_uo = self.sign_uo(uo.clone()).await?;
 
         let uo_hash = self.send_user_operation(&signed_uo).await?;
-        let _ = uo_builder.set_uo_hash(uo_hash.result.clone());
+        let _ = uo_builder.set_uo_hash(uo_hash.result);
 
         let wallet_contract = uo_builder.wallet_contract();
         self.wallet_map

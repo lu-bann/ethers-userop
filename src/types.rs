@@ -78,6 +78,7 @@ pub enum WalletRegistry {
 #[allow(dead_code)]
 impl WalletRegistry {
     pub fn from_str(s: &str) -> anyhow::Result<WalletRegistry> {
+
         match s {
             "simple-account" => Ok(WalletRegistry::SimpleAccount),
             "simple-account-test" => Ok(WalletRegistry::SimpleAccount),
@@ -94,6 +95,7 @@ pub enum WalletFactoryRegistry {
 #[allow(dead_code)]
 impl WalletFactoryRegistry {
     pub fn from_str(s: &str) -> anyhow::Result<WalletFactoryRegistry> {
+
         match s {
             "simple-account" => Ok(WalletFactoryRegistry::SimpleAccountFactory(
                 SIMPLE_ACCOUNT_FACTORY.parse::<Address>().unwrap(),

@@ -9,7 +9,7 @@ To start a [Silius](https://github.com/Vid201/silius) bundler with user operatio
 ```bash
 cargo run --bin bundler
 ```
-To create a [SimpleAccount smart contract wallet](https://github.com/eth-infinitism/account-abstraction/blob/develop/contracts/samples/SimpleAccount.sol)
+To run [examples](https://github.com/qi-protocol/ethers-userop/blob/main/src/bin/example.rs), open a new terminal and 
 ```bash
-cargo run --bin create-smart-contract-wallet
+cargo run --bin example
 ```
