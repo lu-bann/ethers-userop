@@ -7,9 +7,14 @@ An ether-rs middleware to craft UserOperations
 ## Use
 To start a [Silius](https://github.com/Vid201/silius) bundler with user operation pool and JSON-RPC API with default config at `127.0.0.1:3000` on [Geth Testnet](https://chainlist.org/chain/1337)
 ```bash
-cargo run --bin bundler
+cargo run --bin ethuo bundler test
 ```
-To run [examples](https://github.com/qi-protocol/ethers-userop/blob/main/src/bin/example.rs), open a new terminal and 
+To generate a random key and address(generated key will be updated in `config.json`)
 ```bash
-cargo run --bin example
+cargo run --bin ethuo wallet new-key
 ```
+To generate a counter-factual address(generated address will be updated in `config.json`)
+```bash
+cargo run --bin ethuo wallet new-wallet-address
+```
+
