@@ -25,7 +25,8 @@ async fn main() -> anyhow::Result<()> {
     let provider = Provider::<Http>::try_from(eth_client_address.to_string())?;
     let rpc_address = format!("http://{}", "127.0.0.1:3000");
     let chain_id = GETH_CHAIN_ID; // Geth testnet
-    let uo_wallet = UoWallet::from_phrase(seed.as_str(), &U256::from(chain_id)).unwrap();
+    let uo_wallet = UoWallet::from_phrase(seed.as_str(), &U256::from(chain_id), false).unwrap();
+
     let signer_wallet_address = uo_wallet.clone().signer.address();
     let wallet_name = "simple-account-test";
 

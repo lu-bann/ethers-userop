@@ -7,12 +7,12 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.72"
-ethers = "2.0.9"
-silius_primitives = { git = "https://github.com/Vid201/silius.git", rev="33dc6e6", package = "silius-primitives" }
-silius_grpc = { git = "https://github.com/Vid201/silius.git", rev="33dc6e6", package = "silius-grpc" }
-silius_rpc = { git = "https://github.com/Vid201/silius.git", rev="33dc6e6", package = "silius-rpc" }
+ethers = { version="2.0.8", features=["ws"] }
+silius_primitives = { git = "https://github.com/qi-protocol/silius.git", branch="ethuo", package = "silius-primitives" }
+silius_grpc = { git = "https://github.com/qi-protocol/silius.git", branch="ethuo", package = "silius-grpc" }
+silius_rpc = { git = "https://github.com/qi-protocol/silius.git", branch="ethuo", package = "silius-rpc" }
 reqwest = "0.11.18"
-hashbrown = "0.14.0"
+hashbrown = {version="0.14.0", features=["serde"]}
 async-trait = "0.1.72"
 dirs = "5.0.1"
 expanded-pathbuf = "0.1.2"
@@ -32,10 +32,10 @@ log = "0.4.20"
 rand = "0.8.5"
 parking_lot = "0.12.1"
 regex = "1.9.4"
-
+clap = { version = "4", features = ["derive", "env"]}
 
 [[bin]]
-name = "bundler"
+name = "ethuo"
 path = "src/main.rs"
 
 [[bin]]
