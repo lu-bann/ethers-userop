@@ -18,7 +18,7 @@ To generate a counter-factual address(generated address will be updated in `conf
 cargo run --bin ethuo wallet new-wallet-address
 ```
 
-To use `UserOpMiddleware` in your code
+To use `UserOpMiddleware` in your code, see [example](https://github.com/qi-protocol/ethers-userop/blob/main/src/bin/example.rs)
 ```rust
 use ethers::{
     contract::abigen,
